@@ -672,73 +672,58 @@ export function getProgramFromFiles(files: string[], compilerOptions: ts.Compile
 export function generateSchema(program: ts.Program, fullTypeName: string, args = getDefaultArgs()) {
     const typeChecker = program.getTypeChecker();
 
-    var diagnostics = ts.getPreEmitDiagnostics(program);
+    const allSymbols: { [name: string]: ts.Type } = {};
+    const userSymbols: { [name: string]: ts.Type } = {};
+    const inheritingTypes: { [baseName: string]: string[] } = {};
 
-    if (diagnostics.length === 0) {
+    program.getSourceFiles().forEach((sourceFile, sourceFileIdx) => {
+        function inspect(node: ts.Node, tc: ts.TypeChecker) {
 
-        const allSymbols: { [name: string]: ts.Type } = {};
-        const userSymbols: { [name: string]: ts.Type } = {};
-        const inheritingTypes: { [baseName: string]: string[] } = {};
+            if (node.kind === ts.SyntaxKind.ClassDeclaration
+                || node.kind === ts.SyntaxKind.InterfaceDeclaration
+                || node.kind === ts.SyntaxKind.EnumDeclaration
+                || node.kind === ts.SyntaxKind.TypeAliasDeclaration
+            ) {
+                const nodeType = tc.getTypeAtLocation(node);
+                let fullName = tc.getFullyQualifiedName((<any>node).symbol);
 
-        program.getSourceFiles().forEach((sourceFile, sourceFileIdx) => {
-            function inspect(node: ts.Node, tc: ts.TypeChecker) {
+                // remove file name
+                // TODO: we probably don't want this eventually,
+                // as same types can occur in different files and will override eachother in allSymbols
+                // This means atm we can't generate all types in large programs.
+                fullName = fullName.replace(/".*"\./, "");
 
-                if (node.kind === ts.SyntaxKind.ClassDeclaration
-                    || node.kind === ts.SyntaxKind.InterfaceDeclaration
-                    || node.kind === ts.SyntaxKind.EnumDeclaration
-                    || node.kind === ts.SyntaxKind.TypeAliasDeclaration
-                    ) {
-                    const nodeType = tc.getTypeAtLocation(node);
-                    let fullName = tc.getFullyQualifiedName((<any>node).symbol);
+                allSymbols[fullName] = nodeType;
 
-                    // remove file name
-                    // TODO: we probably don't want this eventually,
-                    // as same types can occur in different files and will override eachother in allSymbols
-                    // This means atm we can't generate all types in large programs.
-                    fullName = fullName.replace(/".*"\./, "");
-
-                    allSymbols[fullName] = nodeType;
-
-                    // if (sourceFileIdx == 0)
-                    if (!sourceFile.hasNoDefaultLib) {
-                        userSymbols[fullName] = nodeType;
-                    }
-
-                    const baseTypes = nodeType.getBaseTypes() || [];
-
-                    baseTypes.forEach(baseType => {
-                        var baseName = tc.typeToString(baseType, undefined, ts.TypeFormatFlags.UseFullyQualifiedType);
-                        if (!inheritingTypes[baseName]) {
-                            inheritingTypes[baseName] = [];
-                        }
-                        inheritingTypes[baseName].push(fullName);
-                    });
-                } else {
-                    ts.forEachChild(node, (n) => inspect(n, tc));
+                // if (sourceFileIdx == 0)
+                if (!sourceFile.hasNoDefaultLib) {
+                    userSymbols[fullName] = nodeType;
                 }
-            }
-            inspect(sourceFile, typeChecker);
-        });
 
-        const generator = new JsonSchemaGenerator(allSymbols, inheritingTypes, typeChecker, args);
-        let definition: any;
-        if (fullTypeName === "*") { // All types in file(s)
-            definition = generator.getSchemaForSymbols(userSymbols);
-        } else { // Use specific type as root object
-            definition = generator.getSchemaForSymbol(fullTypeName);
-        }
-        return definition;
-    } else {
-        diagnostics.forEach((diagnostic) => {
-            let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-            if(diagnostic.file) {
-            let { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-            console.warn(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`);
+                const baseTypes = nodeType.getBaseTypes() || [];
+
+                baseTypes.forEach(baseType => {
+                    var baseName = tc.typeToString(baseType, undefined, ts.TypeFormatFlags.UseFullyQualifiedType);
+                    if (!inheritingTypes[baseName]) {
+                        inheritingTypes[baseName] = [];
+                    }
+                    inheritingTypes[baseName].push(fullName);
+                });
             } else {
-                console.warn(message);
+                ts.forEachChild(node, (n) => inspect(n, tc));
             }
-        });
+        }
+        inspect(sourceFile, typeChecker);
+    });
+
+    const generator = new JsonSchemaGenerator(allSymbols, inheritingTypes, typeChecker, args);
+    let definition: any;
+    if (fullTypeName === "*") { // All types in file(s)
+        definition = generator.getSchemaForSymbols(userSymbols);
+    } else { // Use specific type as root object
+        definition = generator.getSchemaForSymbol(fullTypeName);
     }
+    return definition;
 }
 
 export function programFromConfig(configFileName: string) {
