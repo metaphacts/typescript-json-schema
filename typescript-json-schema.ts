@@ -194,8 +194,8 @@ export class JsonSchemaGenerator {
         }
 
         // jsdocs are separate from comments
-        const jsdocs = symbol.getJsDocTags();
-        jsdocs.forEach(doc => {
+      const jsdocs = [] as any//symbol.getDocumentationComment();
+      jsdocs.forEach((doc:any) => {
             // if we have @TJS-... annotations, we have to parse them
             const [name, text] = (doc.name === "TJS" ? new RegExp(REGEX_TJS_JSDOC).exec(doc.text!)!.slice(1,3) : [doc.name, doc.text]) as string[];
             if (JsonSchemaGenerator.validationKeywords[name] || this.userValidationKeywords[name]) {

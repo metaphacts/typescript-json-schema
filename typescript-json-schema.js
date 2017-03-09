@@ -7,6 +7,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     }
     return t;
 };
+Object.defineProperty(exports, "__esModule", { value: true });
 var ts = require("typescript");
 var glob = require("glob");
 var path = require("path");
@@ -53,6 +54,20 @@ function extend(target) {
     }
     return to;
 }
+function unique(arr) {
+    var temp = {};
+    for (var _i = 0, arr_1 = arr; _i < arr_1.length; _i++) {
+        var e = arr_1[_i];
+        temp[e] = true;
+    }
+    var r = [];
+    for (var k in temp) {
+        if (temp.hasOwnProperty(k)) {
+            r.push(k);
+        }
+    }
+    return r;
+}
 var JsonSchemaGenerator = (function () {
     function JsonSchemaGenerator(allSymbols, userSymbols, inheritingTypes, tc, args) {
         if (args === void 0) { args = getDefaultArgs(); }
@@ -95,7 +110,7 @@ var JsonSchemaGenerator = (function () {
         if (comments.length) {
             definition.description = comments.map(function (comment) { return comment.kind === "lineBreak" ? comment.text : comment.text.trim().replace(/\r\n/g, "\n"); }).join("");
         }
-        var jsdocs = symbol.getJsDocTags();
+        var jsdocs = [];
         jsdocs.forEach(function (doc) {
             var _a = (doc.name === "TJS" ? new RegExp(REGEX_TJS_JSDOC).exec(doc.text).slice(1, 3) : [doc.name, doc.text]), name = _a[0], text = _a[1];
             if (JsonSchemaGenerator.validationKeywords[name] || _this.userValidationKeywords[name]) {
@@ -448,7 +463,7 @@ var JsonSchemaGenerator = (function () {
                     return required;
                 }, []);
                 if (requiredProps.length > 0) {
-                    definition.required = requiredProps.sort();
+                    definition.required = unique(requiredProps).sort();
                 }
             }
         }
@@ -565,7 +580,7 @@ var JsonSchemaGenerator = (function () {
                             definition.default = extend(definition.default || {}, other.default);
                         }
                         if (other.required) {
-                            definition.required = (definition.required || []).concat(other.required);
+                            definition.required = unique((definition.required || []).concat(other.required)).sort();
                         }
                     }
                 }
