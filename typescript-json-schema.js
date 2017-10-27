@@ -15,7 +15,7 @@ var ts = require("typescript");
 var vm = require("vm");
 var REGEX_FILE_NAME = /".*"\./;
 var REGEX_TSCONFIG_NAME = /^.*\.json$/;
-var REGEX_TJS_JSDOC = /^-([\w]+)\s([\w-]+)/g;
+var REGEX_TJS_JSDOC = /^-([\w]+)\s+(\S|\S[\s\S]*\S)\s*$/g;
 function getDefaultArgs() {
     return {
         ref: true,
